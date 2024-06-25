@@ -243,6 +243,36 @@ scroll_voice_down_key = (8, 1)  # Example position, adjust as needed
 scroll_pattern_up_key = (9, 0)  # Example position, adjust as needed
 scroll_pattern_down_key = (9, 1)  # Example position, adjust as needed
 
+def handle_button_press(event):
+    global voice_change_flag
+    col, row = divmod(event.key_number, len(col_pins))
+    print(f"Button pressed: {event.key_number}, Row: {row}, Col: {col}")
+    
+    if event.pressed:
+        if (row, col) == scroll_voice_up_key:
+            scroll_voice(0, 1)  # Scroll voice up for row 0, adjust as needed
+        elif (row, col) == scroll_voice_down_key:
+            scroll_voice(0, -1)  # Scroll voice down for row 0, adjust as needed
+        elif (row, col) == scroll_pattern_up_key:
+            scroll_pattern(0, 1)  # Scroll pattern up for row 0, adjust as needed
+        elif (row, col) == scroll_pattern_down_key:
+            scroll_pattern(0, -1)  # Scroll pattern down for row 0, adjust as needed
+        else:
+            # Adjust row to map to voice index
+            if row < 8:
+                voice_index = row // 2  # Integer division to map two rows to one voice index
+                step_index = col + (row % 2) * 8  # Map columns to step index within 16 steps
+                
+                if step_index < 16 and voice_index < 4:  # Ensure within bounds
+                    pattern_index = current_patterns[voice_index]
+                    sequences[pattern_index][voice_index][step_index] = not sequences[pattern_index][voice_index][step_index]  # Toggle step state
+                    light_steps(voice_index, step_index, sequences[pattern_index][voice_index][step_index])  # Update LED
+                    voice_change_flag = True  # Set the flag for voice change
+
+    update_leds()
+
+
+"""
 # Handle button press events and set the flag for voice change
 def handle_button_press(event):
     global voice_change_flag
@@ -267,8 +297,8 @@ def handle_button_press(event):
                     sequences[pattern_index][row][step_index] = not sequences[pattern_index][row][step_index]  # Toggle step state
                     light_steps(row, step_index, sequences[pattern_index][row][step_index])  # Update LED
                     voice_change_flag = True  # Set the flag for voice change
-
 update_leds()
+"""
 print("Setup Complete")
 
 # Main Loop with Shuffle
