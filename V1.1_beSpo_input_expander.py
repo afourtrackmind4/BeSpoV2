@@ -1,7 +1,7 @@
 import board
 import neopixel
 import busio
-from digitalio import DigitalInOut, Direction, Pull
+from digitalio import DigitalInOut, Pull
 import keypad
 import digitalio
 import time
@@ -13,7 +13,7 @@ from adafruit_midi.note_on import NoteOn
 from adafruit_midi.note_off import NoteOff
 
 # Constants and global variables
-NUM_PIXELS = 64 + 4 + 4 + 1 + 1 + 16  # 64 step LEDs + 4 mute + 4 velocity + 1 play + 1 pitch bend + 16 pattern select
+NUM_PIXELS = 64 + 4 + 4 + 1 + 1 + 16
 NUM_ROWS = 12
 NUM_COLS = 8
 SEQUENCE_LENGTH = 16
@@ -32,7 +32,10 @@ COL_PINS = [board.GP6, board.GP7, board.GP8, board.GP9, board.GP10, board.GP11, 
 # Initial setup for global variables
 current_voices = [0] * NUM_ROWS
 current_patterns = [0] * NUM_ROWS
-sequences = [[[0] * SEQUENCE_LENGTH for _ in range(NUM_VOICES)] for _ in range(NUM_PATTERNS)]
+sequences = [[[0] * SEQUENCE_LENGTH for _ in range(NUM_ROWS)] for _ in range(NUM_PATTERNS)]
+print(f"sequences dimensions: {len(sequences)}x{len(sequences[0])}x{len(sequences[0][0])}")  # Debug print
+
+
 
 # Additional global variables
 bpm = 120.0
@@ -46,6 +49,35 @@ voice_change_flag = False
 
 # LED Setup
 pixels = neopixel.NeoPixel(LED_PIN, NUM_PIXELS, auto_write=False)
+
+# Function for LED boot sequence
+def neopixel_boot_sequence():
+    colors = [
+        (255, 0, 0),    # Red
+        (255, 165, 0),  # Orange
+        (255, 255, 0),  # Yellow
+        (0, 255, 0),    # Green
+        (0, 255, 255),  # Cyan
+        (0, 0, 255),    # Blue
+        (128, 0, 128),  # Purple
+        (255, 192, 203) # Pink
+    ]
+    color_index = 0
+    for i in range(NUM_PIXELS):
+        pixels[i] = colors[color_index]
+        pixels.show()
+        time.sleep(0.02)
+        color_index = (color_index + 1) % len(colors)
+
+    # Chase off sequence
+    for i in range(NUM_PIXELS):
+        pixels[i] = (0, 0, 0)
+        pixels.show()
+        time.sleep(0.02)
+
+# Call the boot sequence at the start
+neopixel_boot_sequence()
+
 
 # Define colors for each voice
 voice_colors = {
@@ -62,9 +94,10 @@ voice_colors = {
     10: (0, 128, 0),   # Closed Hi-Hat - Dark Green
 }
 
+
 # MIDI Setup
 uart = busio.UART(MIDI_OUT_PIN, baudrate=31250)
-midi = MIDI(midi_out=uart, out_channel=9)  # MIDI channel 10 is 9 in code (0-15 range)
+midi = MIDI(midi_out=uart, out_channel=9)
 
 # Display Setup
 i2c = board.STEMMA_I2C()
@@ -75,36 +108,39 @@ display.show()
 display.print(bpm)
 display.show()
 
+# Display startup message
+def display_startup_message():
+    display.fill(0)
+    display.marquee("THE", 0.03, loop=False)
+    time.sleep(0.2)
+    display.marquee("BEAT", 0.05, loop=False)
+    time.sleep(0.2)
+    display.marquee("SPOT", 0.04, loop=False)
+    time.sleep(0.05)
+    display.marquee("BPM", 0.02, loop=False)
+    time.sleep(0.2)
+    display.marquee(str(bpm), 0.1, loop=False)
+
+# Call the startup message function
+display_startup_message()
+
+print("Starting LED setup")
 # Rotary Encoder Setup
 rotary_seesaw = seesaw.Seesaw(i2c, addr=0x36)
 encoder = rotaryio.IncrementalEncoder(rotary_seesaw)
 last_encoder_pos = 0
-#  rotary_seesaw.pin_mode(24, digitalio.Pull.UP)  # setup the button pin
 knobbutton_in = seesaw_digitalio.DigitalIO(rotary_seesaw, 24)
 knobbutton = Debouncer(knobbutton_in)
 encoder_pos = encoder.position
+
+print("Starting play button setup")
 
 # Play Button Setup
 start_button_in = DigitalInOut(board.GP3)
 start_button_in.pull = Pull.UP
 start_button = Debouncer(start_button_in)
 
-# Manual GPIO configuration for key matrix
-# Set columns as outputs
-
-"""
-column_pins = [digitalio.DigitalInOut(pin) for pin in COL_PINS]
-for col_pin in column_pins:
-    col_pin.direction = digitalio.Direction.OUTPUT
-    col_pin.value = False  # Set initial state to low
-
-# Set rows as inputs with pull-ups
-row_pins = [digitalio.DigitalInOut(pin) for pin in ROW_PINS]
-for row_pin in row_pins:
-    row_pin.direction = digitalio.Direction.INPUT
-    row_pin.pull = digitalio.Pull.UP
-"""
-python
+print("Starting key matrix setup")
 # Initialize the KeyMatrix using the defined row and column pins
 keys = keypad.KeyMatrix(ROW_PINS, COL_PINS, columns_to_anodes=True)
 
@@ -118,36 +154,151 @@ shuffle_down_key = (10, 1)
 play_button_key = (11, 0)
 global_brightness_up_key = (11, 1)
 global_brightness_down_key = (11, 2)
+print("buttons assinged")
 
 # Function to play a drum note
 def play_drum(note):
     midi.send(NoteOn(note, 120))  # Note on with velocity 120
     time.sleep(0.01)  # Short delay to simulate the note being played
     midi.send(NoteOff(note, 0))  # Note off
+print("drum functions loaded")
 
 # Function to update LEDs based on the current sequence and pointers
+
+"""
 def update_leds():
+    print("Updating LEDs...")
+    print(f"NUM_ROWS: {NUM_ROWS}, SEQUENCE_LENGTH: {SEQUENCE_LENGTH}")
+    print(f"current_voices length: {len(current_voices)}, current_patterns length: {len(current_patterns)}")
+    print(f"sequences dimensions: {len(sequences)}x{len(sequences[0])}x{len(sequences[0][0])}")
+
+    for row in range(NUM_ROWS):
+        for step in range(SEQUENCE_LENGTH):
+            led_index = row * SEQUENCE_LENGTH + step
+            if led_index < NUM_PIXELS:
+                print(f"Updating LED at row: {row}, step: {step}, led_index: {led_index}")
+                voice = current_voices[row]
+                pattern = current_patterns[row]
+                print(f"Current voice: {voice}, Current pattern: {pattern}")
+                color = voice_colors[voice] if sequences[pattern][row][step] else (0, 0, 0)
+                pixels[led_index] = color
+            else:
+                print(f"Skipping LED update at row: {row}, step: {step}, led_index: {led_index} (out of bounds)")
+    pixels.show()
+"""
+
+def update_leds():
+    print("Updating all LEDs...")
+    for row in range(NUM_ROWS):
+        for step in range(SEQUENCE_LENGTH):
+            update_specific_led(row, step)
+
+
+def update_specific_led(row, step):
+    led_index = row * SEQUENCE_LENGTH + step
+    if led_index < NUM_PIXELS:
+        voice = current_voices[row]
+        pattern = current_patterns[row]
+        color = voice_colors[voice] if sequences[pattern][row][step] else (0, 0, 0)
+        pixels[led_index] = color
+        pixels.show()
+    else:
+        print(f"Skipping LED update at row: {row}, step: {step}, led_index: {led_index} (out of bounds)")
+
+def update_all_leds_in_row(row):
+    for step in range(SEQUENCE_LENGTH):
+        update_specific_led(row, step)
+
+
+
+"""
+def update_leds():
+    print("Updating LEDs...")  # Debug print
+    print(f"NUM_ROWS: {NUM_ROWS}, SEQUENCE_LENGTH: {SEQUENCE_LENGTH}")  # Debug print
+    print(f"current_voices length: {len(current_voices)}, current_patterns length: {len(current_patterns)}")  # Debug print
+    print(f"sequences dimensions: {len(sequences)}x{len(sequences[0])}x{len(sequences[0][0])}")  # Debug print
+
     for row in range(NUM_ROWS):
         for step in range(SEQUENCE_LENGTH):
             led_index = row * SEQUENCE_LENGTH + step  # Calculate LED index
+            print(f"Updating LED at row: {row}, step: {step}, led_index: {led_index}")  # Debug print
             voice = current_voices[row]
             pattern = current_patterns[row]
-            state = sequences[pattern][row][step]
-            color = voice_colors[voice] if state else (0, 0, 0)
-            pixels[led_index] = color
+            print(f"Current voice: {voice}, Current pattern: {pattern}")  # Debug print
+
+            if voice < len(voice_colors):  # Ensure voice index is within bounds
+                state = sequences[pattern][row][step]
+                color = voice_colors[voice] if state else (0, 0, 0)
+                pixels[led_index] = color
+            else:
+                print(f"Voice index out of range: {voice}")  # Debug print for out-of-range voice index
+
     pixels.show()
+    print("LEDs updated")  # Debug print
+"""
 
 # Scroll through voices for a specific row
+
 def scroll_voice(row, direction):
     current_voices[row] = (current_voices[row] + direction) % len(voice_colors)
     update_leds()
+print("voice scroll loaded")
 
 # Scroll through patterns for a specific row
 def scroll_pattern(row, direction):
     current_patterns[row] = (current_patterns[row] + direction) % len(sequences)
     update_leds()
+print("pTTERN SELECT LOADED")
 
 # Handle button press events and set the flag for voice change
+def handle_button_press(row, step):
+    if row < 8:  # Step sequencer grid
+        sequences[current_patterns[row]][row][step] = not sequences[current_patterns[row]][row][step]
+        update_specific_led(row, step)
+    elif row == 8:  # Voice mute/unmute
+        voice_index = step // 2
+        current_voices[voice_index] = (current_voices[voice_index] + 1) % len(voice_colors)
+        update_all_leds_in_row(voice_index * 2)
+        update_all_leds_in_row(voice_index * 2 + 1)
+    # Add other button functionalities here as per your requirement
+
+
+"""
+def handle_button_press(event):
+    global voice_change_flag
+    col, row = divmod(event.key_number, len(COL_PINS))
+    print(f"Key pressed at column: {col}, row: {row}, key number: {event.key_number}")  # Debug print
+
+    if event.pressed:
+        if (row, col) == scroll_voice_up_key:
+            scroll_voice(row, 1)  # Scroll voice up for row, adjust as needed
+        elif (row, col) == scroll_voice_down_key:
+            scroll_voice(row, -1)  # Scroll voice down for row, adjust as needed
+        elif (row, col) == scroll_pattern_up_key:
+            scroll_pattern(row, 1)  # Scroll pattern up for row, adjust as needed
+        elif (row, col) == scroll_pattern_down_key:
+            scroll_pattern(row, -1)  # Scroll pattern down for row, adjust as needed
+        else:
+            # Handle normal sequence key presses
+            if row < NUM_ROWS and col < SEQUENCE_LENGTH:
+                step_index = col
+                voice_index = current_voices[row]
+                pattern_index = current_patterns[row]
+
+                # Toggle step state
+                sequences[pattern_index][row][step_index] = not sequences[pattern_index][row][step_index]
+
+                # Update the relevant LED
+                led_index = row * SEQUENCE_LENGTH + step_index
+                if led_index < NUM_PIXELS:  # Ensure led_index is within bounds
+                    state = sequences[pattern_index][row][step_index]
+                    color = voice_colors[voice_index] if state else (0, 0, 0)
+                    pixels[led_index] = color
+                    pixels.show()
+                    print(f"LED updated at index: {led_index}, color: {color}")  # Debug print
+
+                voice_change_flag = True  # Set the flag for voice change
+
 def handle_button_press(event):
     global voice_change_flag
     col, row = divmod(event.key_number, len(COL_PINS))
@@ -195,6 +346,8 @@ def handle_button_press(event):
                 sequences[pattern_index][row][step_index] = not sequences[pattern_index][row][step_index]  # Toggle step state
                 light_steps(row, step_index, sequences[pattern_index][row][step_index])  # Update LED
                 voice_change_flag = True  # Set the flag for voice change
+print("UI grid configured")
+"""
 
 # Main loop to process key events
 def process_keys():
