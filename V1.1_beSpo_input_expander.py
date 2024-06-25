@@ -1,3 +1,4 @@
+
 import board
 import busio
 from digitalio import DigitalInOut, Pull
@@ -334,5 +335,3 @@ try:
 except Exception as e:
     print(f"Main loop error: {e}")
 rn and voice management error: {e}")
-
-
