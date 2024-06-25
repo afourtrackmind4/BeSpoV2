@@ -1,8 +1,9 @@
 import board
 import adafruit_aw9523
+import digitalio
 import time
 from adafruit_ticks import ticks_ms, ticks_diff, ticks_add
-from digitalio import DigitalInOut, Pull
+from digitalio import DigitalInOut, Direction, Pull
 import keypad
 from adafruit_seesaw import seesaw, rotaryio, digitalio
 from adafruit_debouncer import Debouncer
@@ -29,6 +30,22 @@ voice_change_flag = False  # Ensure this is included
 
 # Initialize I2C
 i2c = board.STEMMA_I2C()
+
+# Initialize AW9523
+aw = adafruit_aw9523.AW9523(i2c, address=0x5B)# Configure AW9523 pins for input with external pull-ups
+from digitalio import Direction
+
+# Configure the first 5 pins as inputs with Debouncer
+button_pins = [aw.get_pin(i) for i in range(5)]
+buttons = []
+for pin in button_pins:
+    pin.direction = Direction.INPUT  # Set direction to input
+    # Ensure you have external pull-up resistors
+    buttons.append(Debouncer(pin))
+
+# Define variables for button states
+button_states = [False] * len(button_pins)
+
 
 # Setup play button
 start_button_in = DigitalInOut(board.D11)
@@ -265,6 +282,14 @@ def handle_button_press(event):
     else:
         print(f"Released: Row {row}, Col {col}")
 
+def read_buttons():
+    for i, button in enumerate(buttons):
+        button.update()
+        if button.fell:  # Button press detected
+            print(f"Button {i} pressed")
+        elif button.rose:  # Button release detected
+            print(f"Button {i} released")
+
 # Main Loop with Shuffle
 shuffle_amount = 0.5  # Adjust this value to control the shuffle amount (0.0 to 0.5)
 while True:
@@ -343,3 +368,12 @@ while True:
         elif edit_mode == 3:
             toggle_pattern()
         last_encoder_pos = encoder_pos
+        # Read button states from AW9523 (low priority)
+    read_buttons()
+
+    # Example: Handle button presses
+    for i, pin in enumerate(button_pins):
+        if not pin.value:  # Button pressed (assuming active low)
+            print(f"Button {i} pressed")
+    read_buttons()
+    time.sleep(0.1)  # Small delay for debouncing
