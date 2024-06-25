@@ -97,7 +97,7 @@ col_pins = [board.GP6, board.GP7, board.GP8, board.GP9, board.GP10, board.GP11, 
 row_pins = [board.GP14, board.GP15, board.GP16, board.GP17, board.GP18, board.GP19, board.GP20, board.GP21, board.GP22, board.GP26, board.GP27, board.GP28]
 
 # Initialize the KeyMatrix using the defined row and column pins
-keys = keypad.KeyMatrix(row_pins, col_pins, columns_to_anodes=True)
+keys = keypad.KeyMatrix(row_pins, col_pins, columns_to_anodes=False)
 
 # STEMMA QT Rotary encoder setup
 rotary_seesaw = seesaw.Seesaw(i2c, addr=0x36)
@@ -151,34 +151,34 @@ voice_colors = {
 
 # Load pattern
 def load_pattern(pattern_index):
-global sequence
-sequence = sequences[pattern_index]
-update_leds() # Update LEDs to reflect the loaded pattern
+    global sequence
+    sequence = sequences[pattern_index]
+    update_leds() # Update LEDs to reflect the loaded pattern
 
 # Toggle pattern selection
 def toggle_pattern():
-global current_pattern
-current_pattern = (current_pattern + 1) % num_patterns
-load_pattern(current_pattern)
-display.fill(0)
-display.print(f"Patt:{current_pattern+1}")
+    global current_pattern
+    current_pattern = (current_pattern + 1) % num_patterns
+    load_pattern(current_pattern)
+    display.fill(0)
+    display.print(f"Patt:{current_pattern+1}")
 
 # Scroll through voices for a specific row
 def scroll_voice(row, direction):
-current_voices[row] = (current_voices[row] + direction) % len(voice_colors)
-update_leds()
+    current_voices[row] = (current_voices[row] + direction) % len(voice_colors)
+    update_leds()
 
 # Scroll through patterns for a specific row
 def scroll_pattern(row, direction):
-current_patterns[row] = (current_patterns[row] + direction) % num_patterns
-update_leds()
+    current_patterns[row] = (current_patterns[row] + direction) % num_patterns
+    update_leds()
 
 print("Pattern and voice management complete")
 
 
 ### Section 4: Main Loop and LED Updates
 
-```python
+
 print("Section 4: Main Loop and LED Updates")
 
 # Play drum function
@@ -248,6 +248,7 @@ scroll_pattern_down_key = (9, 1)  # Example position, adjust as needed
 def handle_button_press(event):
     global voice_change_flag
     col, row = divmod(event.key_number, len(col_pins))
+    print(f"Button pressed: {event.key_number}, Row: {row}, Col: {col}")
     if event.pressed:
         if (row, col) == scroll_voice_up_key:
             scroll_voice(0, 1)  # Scroll voice up for row 0, adjust as needed
