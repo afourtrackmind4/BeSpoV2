@@ -119,6 +119,25 @@ try:
     drum_names = ["Bass", "Snar", "LTom", "MTom", "HTom", "Clav", "Clap", "Cowb", "Cymb", "OHat", "CHat"]
     drum_notes = [36, 38, 41, 43, 45, 37, 39, 56, 49, 46, 42]  # general midi drum notes matched to 808
 
+    # Define default pattern for testing and debugging
+    default_pattern = [
+    [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],  # bass drum
+    [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],  # snare
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # low tom
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # mid tom
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # high tom
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # rimshot/claves
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # handclap/maracas
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # cowbell
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # cymbal
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # hihat open
+    [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],  # hihat closed
+]
+
+# Initialize the sequences with the default pattern
+    sequences = [default_pattern.copy() for _ in range(num_patterns)]
+
+
     # Initialize the sequences for multiple patterns
     sequences = [[[0] * sequence_length for _ in range(num_rows)] for _ in range(num_patterns)]
     current_voices = [0] * num_rows
@@ -175,32 +194,71 @@ try:
 
     # Light steps
     def light_steps(voice_index, step_index, state):
-        led_index = voice_index * 16 + step_index  # Map the voice and step to the LED index
-        color = voice_colors.get(voice_index, (8, 125, 60))  # Default to Purple if voice not found
-        if 0 <= led_index < num_pixels:  # Ensure LED index is within the valid range
-            if state:
-                pixels[led_index] = color  # Set color based on voice
-            else:
-                pixels[led_index] = (0, 0, 0)  # Off for inactive steps
-            pixels.show()
+        led_index = voice_index * steps_per_row + step_index  # Map the voice and step to the LED index
+        if led_index < num_pixels:  # Ensure LED index is within the 64 LEDs
+            color = voice_colors.get(voice_index, (8, 125, 60))  # Default to Purple if voice not found
+        if state:
+            pixels[led_index] = color  # Set color based on voice
+        else:
+            pixels[led_index] = (0, 0, 0)  # Off for inactive steps
+        pixels.show()
 
-    # Update LEDs based on the current sequence and pointers
+        # Update LEDs based on the current sequence and pointers
     def update_leds():
         for row in range(num_rows):
             for step in range(steps_per_row):
                 led_index = row * steps_per_row + step
+                if led_index < num_pixels:  # Ensure we're within the 64 LEDs
+                    voice = current_voices[row]
+                    pattern = current_patterns[row]
+                    state = sequences[pattern][row][step]
+                    color = voice_colors[voice] if state else (0, 0, 0)
+                    pixels[led_index] = color
+        pixels.show()
+# Update LEDs based on the current sequence and pointers
+    def update_leds():
+        for row in range(num_rows):
+            for step in range(steps_per_row):
+                led_index = row * steps_per_row + step
+            if led_index < num_pixels:  # Ensure we are within the bounds of our LED grid
                 voice = current_voices[row]
                 pattern = current_patterns[row]
                 state = sequences[pattern][row][step]
                 color = voice_colors[voice] if state else (0, 0, 0)
                 pixels[led_index] = color
-        pixels.show()
+    pixels.show()
 
-    # Light the current beat
+# Handle button press events and set the flag for voice change
+    def handle_button_press(event):
+        global voice_change_flag
+        col, row = divmod(event.key_number, len(col_pins))
+        if event.pressed:
+            if (row, col) == scroll_voice_up_key:
+                scroll_voice(0, 1)  # Scroll voice up for row 0, adjust as needed
+        elif (row, col) == scroll_voice_down_key:
+            scroll_voice(0, -1)  # Scroll voice down for row 0, adjust as needed
+        elif (row, col) == scroll_pattern_up_key:
+            scroll_pattern(0, 1)  # Scroll pattern up for row 0, adjust as needed
+        elif (row, col) == scroll_pattern_down_key:
+            scroll_pattern(0, -1)  # Scroll pattern down for row 0, adjust as needed
+        else:
+            # Handle normal sequence key presses
+            if row < num_rows and col < steps_per_row:
+                step_index = col
+                voice_index = current_voices[row]
+                pattern_index = current_patterns[row]
+                if step_index < len(sequences[pattern_index][row]):  # Ensure step_index is within the bounds of the sequence
+                    sequences[pattern_index][row][step_index] = not sequences[pattern_index][row][step_index]  # Toggle step state
+                    light_steps(row, step_index, sequences[pattern_index][row][step_index])  # Update LED
+                    voice_change_flag = True  # Set the flag for voice change
+
+# Light the current beat
     def light_beat(step):
-        if 0 <= step < num_pixels:
-            pixels[step] = (70, 20, 0)  # Red color for the beat indicator
-            pixels.show()
+        for row in range(num_rows):  # Ensure it iterates through rows
+            led_index = row * steps_per_row + step
+        if led_index < num_pixels:
+            pixels[led_index] = (70, 20, 0)  # Red color for the beat indicator
+    pixels.show()
 
     # Toggle edit mode
     def edit_mode_toggle():
@@ -227,34 +285,16 @@ try:
     scroll_pattern_up_key = (9, 0)  # Example position, adjust as needed
     scroll_pattern_down_key = (9, 1)  # Example position, adjust as needed
 
-    # Handle button press events and set the flag for voice change
-    def handle_button_press(event):
-        global voice_change_flag
-        col, row = divmod(event.key_number, len(col_pins))
-        if event.pressed:
-            if (row, col) == scroll_voice_up_key:
-                scroll_voice(0, 1)  # Scroll voice up for row 0, adjust as needed
-            elif (row, col) == scroll_voice_down_key:
-                scroll_voice(0, -1)  # Scroll voice down for row 0, adjust as needed
-            elif (row, col) == scroll_pattern_up_key:
-                scroll_pattern(0, 1)  # Scroll pattern up for row 0, adjust as needed
-            elif (row, col) == scroll_pattern_down_key:
-                scroll_pattern(0, -1)  # Scroll pattern down for row 0, adjust as needed
-            else:
-                # Handle normal sequence key presses
-                if row < num_rows and col < steps_per_row:
-                    step_index = col
-                    voice_index = current_voices[row]
-                    pattern_index = current_patterns[row]
-                    sequences[pattern_index][row][step_index] = not sequences[pattern_index][row][step_index]  # Toggle step state
-                    light_steps(row, step_index, sequences[pattern_index][row][step_index])  # Update LED
-                    voice_change_flag = True  # Set the flag for voice change
 
     update_leds()
     print("Setup Complete")
 
+
+
     # Main Loop with Shuffle
     shuffle_amount = 0.0  # Adjust this value to control the shuffle amount (0.0 to 0.5)
+    sequence = sequences[current_pattern]
+
     while True:
         sequence = sequences[current_pattern]
         # Update the start button state
@@ -280,10 +320,31 @@ try:
                     time.sleep(shuffle_amount * steps_millis / 1000.0)
 
                 light_beat(step_counter)  # Update beat indicator LED
-                for i in range(num_drums):
-                    if sequence[i][step_counter]:  # if a 1 at step seq, play it
-                        play_drum(drum_notes[i % len(drum_notes)])
-                light_steps(curr_drum, step_counter, sequence[curr_drum][step_counter])
+
+                # Debugging prints to check indices and arrays
+                print(f"step_counter: {step_counter}")
+                print(f"sequence length: {len(sequence)}")  # Check length of sequence
+                for i in range(min(num_rows, len(sequence))):  # Ensure we stay within bounds
+                    print(f"Checking sequence[{i}]: {sequence[i]}")
+                    if step_counter < len(sequence[i]):  # Ensure step_counter is within the length of sequence[i]
+                        if sequence[i][step_counter]:  # Check if step_counter is within bounds
+                            if i < len(drum_notes):
+                                play_drum(drum_notes[i % len(drum_notes)])
+                            else:
+                                print(f"Index {i} out of range for drum_notes (length {len(drum_notes)})")
+                        light_steps(i, step_counter, sequence[i][step_counter])
+                    else:
+                        print(f"step_counter {step_counter} out of range for sequence[{i}] (length {len(sequence[i])})")
+
+                print(f"curr_drum: {curr_drum}")  # Print curr_drum value
+                if curr_drum < len(sequence):
+                    if step_counter < len(sequence[curr_drum]):
+                        light_steps(curr_drum, step_counter, sequence[curr_drum][step_counter])
+                    else:
+                        print(f"step_counter {step_counter} out of range for sequence[{curr_drum}] (length {len(sequence[curr_drum])})")
+                else:
+                    print(f"curr_drum {curr_drum} out of range (length {len(sequence)})")
+
                 step_counter = (step_counter + 1) % sequence_length
                 encoder_pos = encoder.position  # only check encoder while playing between steps
                 knobbutton.update()  # Update knobbutton state
