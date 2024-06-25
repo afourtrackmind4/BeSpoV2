@@ -59,9 +59,9 @@ start_button_in = DigitalInOut(board.GP3)
 start_button_in.pull = Pull.UP
 start_button = Debouncer(start_button_in)
 
-# Define row and column pins for the 8x8 matrix
-row_pins = [board.GP6, board.GP7, board.GP8, board.GP9, board.GP10, board.GP11, board.GP12, board.GP13]
-col_pins = [board.GP16, board.GP17, board.GP18, board.GP19, board.GP20, board.GP21, board.GP22, board.GP26]
+# Define row and column pins for the 10 x 10 (8+2)x(8x2) matrix
+col_pins = [board.GP6, board.GP7, board.GP8, board.GP9, board.GP10, board.GP11, board.GP12, board.GP13]
+row_pins = [board.GP14, board.GP15, board.GP16, board.GP17, board.GP18, board.GP19, board.GP20, board.GP21, board.GP22, board.GP26, board.GP27, board.GP28]
 
 # Initialize the KeyMatrix using the defined row and column pins
 keys = keypad.KeyMatrix(row_pins, col_pins, columns_to_anodes=True)
@@ -81,13 +81,36 @@ uart = busio.UART(board.GP0, baudrate=31250)
 # Initialize MIDI over UART
 midi = MIDI(midi_out=uart, out_channel=9)  # MIDI channel 10 is 9 in code (0-15 range)
 
+# Update LEDs based on the current sequence and pointers
+def update_leds():
+    for row in range(num_rows):
+        for step in range(steps_per_row):
+            led_index = row * steps_per_row + step
+            voice = current_voices[row]
+            pattern = current_patterns[row]
+            state = sequences[pattern][row][step]
+            color = voice_colors[voice] if state else (0, 0, 0)
+            pixels[led_index] = color
+    pixels.show()
+
+# Scroll through voices for a specific row
+def scroll_voice(row, direction):
+    current_voices[row] = (current_voices[row] + direction) % len(voice_colors)
+    update_leds()
+
+# Scroll through patterns for a specific row
+def scroll_pattern(row, direction):
+    current_patterns[row] = (current_patterns[row] + direction) % num_patterns
+    update_leds()
+
+"""
 # Update LEDs based on the current sequence (Rev 2)
 def update_leds():
     for voice_index in range(num_drums):
         for step_index in range(sequence_length):
             light_steps(voice_index, step_index, sequence[voice_index][step_index])
     pixels.show()  # Ensure the LEDs are updated visually
-
+"""
 
 # V1.1 Define colors for each voice
 voice_colors = {
@@ -117,9 +140,17 @@ def neopixel_boot_sequence():
 
 # Call the boot sequence
 neopixel_boot_sequence()
+# Initialize sequence and current voice/pattern pointers
+num_patterns = 4
+sequences = [[[0] * sequence_length for _ in range(num_rows)] for _ in range(num_patterns)]
+current_voices = [0] * num_rows
+current_patterns = [0] * num_rows
+
+
 
 # Define multiple patterns (Rev 1)
-num_patterns = 1
+num_patterns = 4
+current_voices = [0] * num_rows
 sequences = [[[0] * sequence_length for _ in range(num_drums)] for _ in range(num_patterns)]
 
 # Initialize to load the first pattern by default (Rev 1)
@@ -138,6 +169,7 @@ def toggle_pattern():
     display.fill(0)
     display.print(f"Patt:{current_pattern+1}")
 
+update_leds()
 
 # Drum setup
 drum_names = ["Bass", "Snar", "LTom", "MTom", "HTom", "Clav", "Clap", "Cowb", "Cymb", "OHat", "CHat"]
@@ -245,7 +277,35 @@ time.sleep(0.05)
 display.marquee("BPM", 0.02, loop=False)
 time.sleep(0.2)
 display.marquee(str(bpm), 0.1, loop=False)
+# Define keys for scrolling in the extended matrix
+scroll_voice_up_key = (8, 0)  # Example position, adjust as needed
+scroll_voice_down_key = (8, 1)  # Example position, adjust as needed
+scroll_pattern_up_key = (9, 0)  # Example position, adjust as needed
+scroll_pattern_down_key = (9, 1)  # Example position, adjust as needed
 
+# Handle button press events and set the flag for voice change
+def handle_button_press(event):
+    global voice_change_flag
+    col, row = divmod(event.key_number, len(col_pins))
+    if event.pressed:
+        if (row, col) == scroll_voice_up_key:
+            scroll_voice(0, 1)  # Scroll voice up for row 0, adjust as needed
+        elif (row, col) == scroll_voice_down_key:
+            scroll_voice(0, -1)  # Scroll voice down for row 0, adjust as needed
+        elif (row, col) == scroll_pattern_up_key:
+            scroll_pattern(0, 1)  # Scroll pattern up for row 0, adjust as needed
+        elif (row, col) == scroll_pattern_down_key:
+            scroll_pattern(0, -1)  # Scroll pattern down for row 0, adjust as needed
+        else:
+            # Handle normal sequence key presses
+            if row < num_rows and col < steps_per_row:
+                step_index = col
+                voice_index = current_voices[row]
+                pattern_index = current_patterns[row]
+                sequences[pattern_index][row][step_index] = not sequences[pattern_index][row][step_index]  # Toggle step state
+                light_steps(row, step_index, sequences[pattern_index][row][step_index])  # Update LED
+                voice_change_flag = True  # Set the flag for voice change
+"""
 # Handle button press events and set the flag for voice change
 def handle_button_press(event):
     global voice_change_flag
@@ -266,9 +326,9 @@ def handle_button_press(event):
             sequence[voice_index][step_index] = not sequence[voice_index][step_index]  # Toggle step state
             light_steps(voice_index, step_index, sequence[voice_index][step_index])  # Update LED
             voice_change_flag = True  # Set the flag for voice change
-            print(f"Pressed: Row {row}, Col {col} | Voice Index: {voice_index} | Step Index: {step_index} | State: {sequence[voice_index][step_index]}")
-    else:
-        print(f"Released: Row {row}, Col {col}")
+#            print(f"Pressed: Row {row}, Col {col} | Voice Index: {voice_index} | Step Index: {step_index} | State: {sequence[voice_index][step_index]}")
+#    else:
+#        print(f"Released: Row {row}, Col {col}")
 
 # def read_buttons():
 #     for i, button in enumerate(buttons):
@@ -277,8 +337,95 @@ def handle_button_press(event):
 #             print(f"Button {i} pressed")
 #         elif button.rose:  # Button release detected
 #             print(f"Button {i} released")
+"""
+update_leds()
 
 # Main Loop with Shuffle
+shuffle_amount = 0.0  # Adjust this value to control the shuffle amount (0.0 to 0.5)
+while True:
+    # Update the start button state
+    start_button.update()
+    if start_button.fell:  # If the play button is pressed
+        if playing:
+            print_sequence()
+        playing = not playing
+        step_counter = 0
+        last_step = int(ticks_add(ticks_ms(), -steps_millis))
+        print("*** Play:", playing)
+        update_leds()
+
+    if playing:
+        now = ticks_ms()
+        diff = ticks_diff(now, last_step)
+        if diff >= steps_millis:
+            late_time = ticks_diff(int(diff), int(steps_millis))
+            last_step = ticks_add(now, -late_time // 2)
+
+            # Apply shuffle to every other step
+            if step_counter % 2 == 0:
+                time.sleep(shuffle_amount * steps_millis / 1000.0)
+
+            light_beat(step_counter)  # Update beat indicator LED
+            for i in range(num_drums):
+                if sequence[i][step_counter]:  # if a 1 at step seq, play it
+                    play_drum(drum_notes[i % len(drum_notes)])
+            light_steps(curr_drum, step_counter, sequence[curr_drum][step_counter])
+            step_counter = (step_counter + 1) % sequence_length
+            encoder_pos = encoder.position  # only check encoder while playing between steps
+            knobbutton.update()  # Update knobbutton state
+            if knobbutton.fell:
+                edit_mode_toggle()
+    else:
+        # Check the encoder all the time when not playing
+        encoder_pos = encoder.position
+        knobbutton.update()  # Update knobbutton state
+        if knobbutton.fell:  # Change edit mode, refresh display
+            edit_mode_toggle()
+
+    # Handle keypad events for the 10x10 matrix
+    event = keys.events.get()
+    if event:
+        handle_button_press(event)
+
+    # Handle the voice change outside the timing-critical section
+    if encoder_pos != last_encoder_pos:
+        encoder_delta = encoder_pos - last_encoder_pos
+        if edit_mode == 1:  # Assuming edit_mode 1 is for voice
+            row_to_edit = (curr_drum // num_rows) % num_rows  # Adjust based on current drum
+            scroll_voice(row_to_edit, encoder_delta)
+            display.fill(0)
+            display.print(drum_names[current_voices[row_to_edit] % len(drum_names)])
+            last_encoder_pos = encoder_pos
+        elif edit_mode == 3:  # Assuming edit_mode 3 is for pattern
+            row_to_edit = (curr_drum // num_rows) % num_rows  # Adjust based on current drum
+            scroll_pattern(row_to_edit, encoder_delta)
+            display.fill(0)
+            display.print(f"Patt:{current_patterns[row_to_edit] + 1}")
+            last_encoder_pos = encoder_pos
+
+    # Adjust BPM if the encoder was moved and edit mode is 0 (BPM mode)
+    if encoder_pos != last_encoder_pos:
+        encoder_delta = encoder_pos - last_encoder_pos
+        if edit_mode == 0:
+            bpm = bpm + (encoder_delta / 10)  # Adjust BPM by the encoder delta
+            bpm = min(max(bpm, 60.0), 220.0)  # Clamp BPM between 60 and 220
+            beat_time = 60.0 / bpm  # time length of a single beat
+            beat_millis = beat_time * 1000.0
+            steps_millis = beat_millis / steps_per_beat
+            display.fill(0)
+            display.print(f"{bpm:.1f}")
+        elif edit_mode == 2:
+            shuffle_amount = shuffle_amount + (encoder_delta / 100)
+            shuffle_amount = min(max(shuffle_amount, 0.0), 0.5)  # Clamp shuffle amount between 0.0 and 0.5
+            display.fill(0)
+            display.print(f"Shfl:{shuffle_amount:.2f}")
+        elif edit_mode == 3:
+            toggle_pattern()
+        last_encoder_pos = encoder_pos
+
+
+
+""" Main Loop with Shuffle
 shuffle_amount = 0.0  # Adjust this value to control the shuffle amount (0.0 to 0.5)
 while True:
     # Update the start button state
@@ -365,3 +512,4 @@ while True:
 #             print(f"Button {i} pressed")
 #     read_buttons()
 #    time.sleep(0.1)  # Small delay for debouncing
+"""
