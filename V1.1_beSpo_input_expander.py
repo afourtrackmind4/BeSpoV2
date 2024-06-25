@@ -41,7 +41,7 @@ buttons = []
 for pin in button_pins:
     pin.direction = Direction.INPUT  # Set direction to input
     # Ensure you have external pull-up resistors
-    buttons.append(Debouncer(pin))
+    buttons.append(Debouncer(pin, interval=0.08))  # Adjust the interval if necessary
 
 # Define variables for button states
 button_states = [False] * len(button_pins)
@@ -88,23 +88,23 @@ def update_leds():
 
 # V1.1 Define colors for each voice
 voice_colors = {
-    0: (255, 0, 0),    # Bass drum - Red
-    1: (0, 255, 0),    # Snare - Green
-    2: (0, 0, 255),    # Low Tom - Blue
-    3: (255, 255, 0),  # Mid Tom - Yellow
-    4: (255, 0, 255),  # High Tom - Magenta
-    5: (0, 255, 255),  # Rimshot - Cyan
-    6: (255, 165, 0),  # Hand Clap - Orange
-    7: (75, 0, 130),   # Cowbell - Indigo
+    0: (50, 205, 149),    # Bass drum - Red
+    1: (204, 51, 203),    # Snare - Orange
+    2: (128, 0, 128),    # Low Tom - Yellow
+    3: (51, 15, 204),  # Mid Tom - Green
+    4: (204, 0, 204),  # High Tom - Green/Blue
+    5: (51, 51, 204),  # Rimshot - Light Blue
+    6: (51, 51, 204),  # Hand Clap - Blue
+    7: (51, 153, 204),   # Cowbell - Indigo
     8: (128, 0, 128),  # Cymbal - Purple
-    9: (255, 192, 203),# Open Hi-Hat - Pink
-    10: (0, 128, 0),   # Closed Hi-Hat - Dark Green
+    9: (204, 51, 203),# Open Hi-Hat - Pink
+    10: (50, 205, 149),   # Closed Hi-Hat - Fuscia
 }
 
 # Boot sequence for Neopixels
 def neopixel_boot_sequence():
     for i in range(num_pixels):
-        pixels[i] = (0, 70, 150)  # Blue color for boot sequence
+        pixels[i] = (50, 205, 149)  # Blue color for boot sequence
         pixels.show()
         time.sleep(0.008)
     time.sleep(0.1)
@@ -159,21 +159,6 @@ def play_drum(note):
     midi.send(NoteOn(note, 120))  # Note on with velocity 120
     time.sleep(0.01)  # Short delay to simulate the note being played
     midi.send(NoteOff(note, 0))  # Note off
-
-# V1.1 Define colors for each voice
-voice_colors = {
-    0: (255, 0, 0),    # Bass drum - Red
-    1: (0, 255, 0),    # Snare - Green
-    2: (0, 0, 255),    # Low Tom - Blue
-    3: (255, 255, 0),  # Mid Tom - Yellow
-    4: (255, 0, 255),  # High Tom - Magenta
-    5: (0, 255, 255),  # Rimshot - Cyan
-    6: (255, 165, 0),  # Hand Clap - Orange
-    7: (75, 0, 130),   # Cowbell - Indigo
-    8: (128, 0, 128),  # Cymbal - Purple
-    9: (255, 192, 203),# Open Hi-Hat - Pink
-    10: (0, 128, 0),   # Closed Hi-Hat - Dark Green
-}
 
 
 # Light steps (v1.1)
@@ -291,7 +276,7 @@ def read_buttons():
             print(f"Button {i} released")
 
 # Main Loop with Shuffle
-shuffle_amount = 0.5  # Adjust this value to control the shuffle amount (0.0 to 0.5)
+shuffle_amount = 0.0  # Adjust this value to control the shuffle amount (0.0 to 0.5)
 while True:
     # Update the start button state
 
@@ -376,4 +361,4 @@ while True:
         if not pin.value:  # Button pressed (assuming active low)
             print(f"Button {i} pressed")
     read_buttons()
-    time.sleep(0.1)  # Small delay for debouncing
+#    time.sleep(0.01)  # Small delay for debouncing
