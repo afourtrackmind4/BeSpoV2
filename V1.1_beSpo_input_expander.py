@@ -36,6 +36,8 @@ num_patterns = 4
 current_pattern = 0  # Initialize current_pattern here
 edit_mode = 0  # Initialize edit mode
 num_modes = 4  # Number of edit modes
+current_voices = [0] * num_rows
+current_patterns = [0] * num_rows
 
 # Initialize I2C
 i2c = board.STEMMA_I2C()
@@ -149,30 +151,34 @@ voice_colors = {
 
 # Load pattern
 def load_pattern(pattern_index):
-    global sequence
-    sequence = sequences[pattern_index]
-    update_leds()  # Update LEDs to reflect the loaded pattern
+global sequence
+sequence = sequences[pattern_index]
+update_leds() # Update LEDs to reflect the loaded pattern
 
 # Toggle pattern selection
 def toggle_pattern():
-    global current_pattern
-    current_pattern = (current_pattern + 1) % num_patterns
-    load_pattern(current_pattern)
-    display.fill(0)
-    display.print(f"Patt:{current_pattern+1}")
+global current_pattern
+current_pattern = (current_pattern + 1) % num_patterns
+load_pattern(current_pattern)
+display.fill(0)
+display.print(f"Patt:{current_pattern+1}")
 
 # Scroll through voices for a specific row
 def scroll_voice(row, direction):
-    current_voices[row] = (current_voices[row] + direction) % len(voice_colors)
-    update_leds()
+current_voices[row] = (current_voices[row] + direction) % len(voice_colors)
+update_leds()
 
 # Scroll through patterns for a specific row
 def scroll_pattern(row, direction):
-    current_patterns[row] = (current_patterns[row] + direction) % num_patterns
-    update_leds()
+current_patterns[row] = (current_patterns[row] + direction) % num_patterns
+update_leds()
 
 print("Pattern and voice management complete")
 
+
+### Section 4: Main Loop and LED Updates
+
+```python
 print("Section 4: Main Loop and LED Updates")
 
 # Play drum function
@@ -186,11 +192,11 @@ def light_steps(voice_index, step_index, state):
     led_index = voice_index * steps_per_row + step_index  # Map the voice and step to the LED index
     if led_index < num_pixels:  # Ensure LED index is within the 64 LEDs
         color = voice_colors.get(voice_index, (8, 125, 60))  # Default to Purple if voice not found
-    if state:
-        pixels[led_index] = color  # Set color based on voice
-    else:
-        pixels[led_index] = (0, 0, 0)  # Off for inactive steps
-    pixels.show()
+        if state:
+            pixels[led_index] = color  # Set color based on voice
+        else:
+            pixels[led_index] = (0, 0, 0)  # Off for inactive steps
+        pixels.show()
 
 # Update LEDs based on the current sequence and pointers
 def update_leds():
@@ -209,8 +215,8 @@ def update_leds():
 def light_beat(step):
     for row in range(num_rows):  # Ensure it iterates through rows
         led_index = row * steps_per_row + step
-    if led_index < num_pixels:
-        pixels[led_index] = (70, 20, 0)  # Red color for the beat indicator
+        if led_index < num_pixels:
+            pixels[led_index] = (70, 20, 0)  # Red color for the beat indicator
     pixels.show()
 
 # Toggle edit mode
@@ -261,6 +267,9 @@ def handle_button_press(event):
                     sequences[pattern_index][row][step_index] = not sequences[pattern_index][row][step_index]  # Toggle step state
                     light_steps(row, step_index, sequences[pattern_index][row][step_index])  # Update LED
                     voice_change_flag = True  # Set the flag for voice change
+
+update_leds()
+print("Setup Complete")
 
 # Main Loop with Shuffle
 shuffle_amount = 0.0  # Adjust this value to control the shuffle amount (0.0 to 0.5)
