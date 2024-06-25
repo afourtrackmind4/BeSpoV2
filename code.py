@@ -1,6 +1,7 @@
 import board
 import time
 from adafruit_ticks import ticks_ms, ticks_diff, ticks_add
+import digitalio
 from digitalio import DigitalInOut, Pull
 import keypad
 from adafruit_seesaw import seesaw, rotaryio, digitalio
@@ -41,6 +42,7 @@ current_patterns = [0] * num_rows
 
 # Initialize I2C
 i2c = board.STEMMA_I2C()
+
 
 # Setup play button
 start_button_in = DigitalInOut(board.GP3)
@@ -92,11 +94,13 @@ print("Initialization complete")
 print("Section 2: Matrix Configuration and Key Handling")
 
 # Define row and column pins for the 12x8 matrix
-col_pins = [board.GP6, board.GP7, board.GP8, board.GP9, board.GP10, board.GP11, board.GP12, board.GP13]
-row_pins = [board.GP14, board.GP15, board.GP16, board.GP17, board.GP18, board.GP19, board.GP20, board.GP21, board.GP22, board.GP26, board.GP27, board.GP28]
+row_pins = [board.GP6, board.GP7, board.GP8, board.GP9, board.GP10, board.GP11, board.GP12, board.GP13]
+col_pins = [board.GP14, board.GP15, board.GP16, board.GP17, board.GP18, board.GP19, board.GP20, board.GP21, board.GP22, board.GP26, board.GP27, board.GP28]
 
-# Initialize the KeyMatrix using the defined row and column pins
-keys = keypad.KeyMatrix(row_pins, col_pins, columns_to_anodes=False)  # Correctly set columns_to_anodes to False
+
+# Initialize KeyMatrix with correct configuration
+keys = keypad.KeyMatrix(row_pins, col_pins, columns_to_anodes=True)
+  # Correctly set columns_to_anodes to False
 
 # STEMMA QT Rotary encoder setup
 rotary_seesaw = seesaw.Seesaw(i2c, addr=0x36)
