@@ -1,17 +1,16 @@
-
 import board
-import busio
+import time
+from adafruit_ticks import ticks_ms, ticks_diff, ticks_add
 from digitalio import DigitalInOut, Pull
 import keypad
-from adafruit_seesaw import seesaw, rotaryio, digitalio as seesaw_digitalio
+from adafruit_seesaw import seesaw, rotaryio, digitalio
 from adafruit_debouncer import Debouncer
 from adafruit_ht16k33 import segments
+import neopixel
+import busio
 from adafruit_midi import MIDI
 from adafruit_midi.note_on import NoteOn
 from adafruit_midi.note_off import NoteOff
-import neopixel
-import time
-from adafruit_ticks import ticks_ms, ticks_diff, ticks_add
 
 print("Section 1: Initialization and Setup")
 
@@ -34,6 +33,10 @@ try:
     curr_drum = 0
     playing = False
     voice_change_flag = False  # Ensure this is included
+    num_patterns = 4
+    current_pattern = 0  # Initialize current_pattern here
+    edit_mode = 0  # Initialize edit mode
+    num_modes = 4  # Number of edit modes
 
     # Initialize I2C
     i2c = board.STEMMA_I2C()
@@ -87,9 +90,6 @@ try:
     print("Initialization complete")
 except Exception as e:
     print(f"Initialization error: {e}")
-
-
-
 print("Section 2: Matrix Configuration and Key Handling")
 
 try:
@@ -104,19 +104,22 @@ try:
     rotary_seesaw = seesaw.Seesaw(i2c, addr=0x36)
     encoder = rotaryio.IncrementalEncoder(rotary_seesaw)
     last_encoder_pos = 0
-    rotary_seesaw.pin_mode(24, rotary_seesaw_digitalio.INPUT_PULLUP)  # setup the button pin
-    knobbutton_in = seesaw_digitalio.DigitalIO(rotary_seesaw, 24)
+    rotary_seesaw.pin_mode(24, rotary_seesaw.INPUT_PULLUP)  # setup the button pin
+    knobbutton_in = digitalio.DigitalIO(rotary_seesaw, 24)
     knobbutton = Debouncer(knobbutton_in)
     encoder_pos = encoder.position
 
     print("Matrix configuration complete")
 except Exception as e:
     print(f"Matrix configuration error: {e}")
-
 print("Section 3: Pattern and Voice Management")
 
 try:
-    num_patterns = 4
+    # Drum setup
+    drum_names = ["Bass", "Snar", "LTom", "MTom", "HTom", "Clav", "Clap", "Cowb", "Cymb", "OHat", "CHat"]
+    drum_notes = [36, 38, 41, 43, 45, 37, 39, 56, 49, 46, 42]  # general midi drum notes matched to 808
+
+    # Initialize the sequences for multiple patterns
     sequences = [[[0] * sequence_length for _ in range(num_rows)] for _ in range(num_patterns)]
     current_voices = [0] * num_rows
     current_patterns = [0] * num_rows
@@ -148,7 +151,7 @@ try:
         current_pattern = (current_pattern + 1) % num_patterns
         load_pattern(current_pattern)
         display.fill(0)
-        display.print(f"Patt:{current_pattern + 1}")
+        display.print(f"Patt:{current_pattern+1}")
 
     # Scroll through voices for a specific row
     def scroll_voice(row, direction):
@@ -162,8 +165,7 @@ try:
 
     print("Pattern and voice management complete")
 except Exception as e:
-    print(f"Patteprint("Section 4: Main Loop and LED Updates")
-
+    print(f"Pattern and voice management error: {e}")
 try:
     # Play drum function
     def play_drum(note):
@@ -249,10 +251,12 @@ try:
                     voice_change_flag = True  # Set the flag for voice change
 
     update_leds()
+    print("Setup Complete")
 
     # Main Loop with Shuffle
     shuffle_amount = 0.0  # Adjust this value to control the shuffle amount (0.0 to 0.5)
     while True:
+        sequence = sequences[current_pattern]
         # Update the start button state
         start_button.update()
         if start_button.fell:  # If the play button is pressed
@@ -334,4 +338,3 @@ try:
             last_encoder_pos = encoder_pos
 except Exception as e:
     print(f"Main loop error: {e}")
-rn and voice management error: {e}")
