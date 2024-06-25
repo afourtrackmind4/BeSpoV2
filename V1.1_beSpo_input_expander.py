@@ -13,8 +13,12 @@ import busio
 from adafruit_midi import MIDI
 from adafruit_midi.note_on import NoteOn
 from adafruit_midi.note_off import NoteOff
+import machine
+
+# i2c = machine.I2C(1, scl=machine.Pin(13), sda=machine.Pin(12), freq=100000)
 
 # Global Variables
+
 num_steps = 16
 num_drums = 11
 bpm = 120.0
@@ -29,7 +33,7 @@ playing = False
 voice_change_flag = False  # Ensure this is included
 
 # Initialize I2C
-i2c = board.STEMMA_I2C()
+i2c = busio.I2C(board.GP12, board.GP13)
 
 # Initialize AW9523
 aw = adafruit_aw9523.AW9523(i2c, address=0x5B)# Configure AW9523 pins for input with external pull-ups
@@ -193,7 +197,7 @@ def light_steps(voice_index, step_index, state):
 # set the leds
 for j in range(sequence_length):
     light_steps(curr_drum, j, sequence[curr_drum][j])
-update_leds()
+    update_leds()
 
 # Light the current beat
 def light_beat(step):
@@ -303,7 +307,7 @@ while True:
         step_counter = 0
         last_step = int(ticks_add(ticks_ms(), -steps_millis))
         print("*** Play:", playing)
-        update_leds()
+#        update_leds()
 
     if playing:
         now = ticks_ms()
@@ -343,7 +347,7 @@ while True:
         encoder_delta = encoder_pos - last_encoder_pos
         if edit_mode == 1:
             curr_drum = (curr_drum + encoder_delta) % num_drums
-            update_leds()
+#            update_leds()
             display.fill(0)
             display.print(drum_names[curr_drum % len(drum_names)])
             print(f"Changing voice from {curr_drum} to {(curr_drum + encoder_delta) % num_drums}")
