@@ -1,23 +1,26 @@
 import board
-import adafruit_aw9523
-import digitalio
+# import adafruit_aw9523
 import time
 from adafruit_ticks import ticks_ms, ticks_diff, ticks_add
+import busio
 from digitalio import DigitalInOut, Direction, Pull
 import keypad
 from adafruit_seesaw import seesaw, rotaryio, digitalio
 from adafruit_debouncer import Debouncer
 from adafruit_ht16k33 import segments
-import neopixel
-import busio
 from adafruit_midi import MIDI
 from adafruit_midi.note_on import NoteOn
 from adafruit_midi.note_off import NoteOff
-import machine
-
-# i2c = machine.I2C(1, scl=machine.Pin(13), sda=machine.Pin(12), freq=100000)
+import neopixel
 
 # Global Variables
+
+# Initialize WS2811 LEDs on pin RX
+num_pixels = 64
+num_rows = 4
+steps_per_row = num_pixels // num_rows  # This should be 16
+pixels = neopixel.NeoPixel(board.GP2, num_pixels, auto_write=True)
+
 
 num_steps = 16
 num_drums = 11
@@ -33,32 +36,32 @@ playing = False
 voice_change_flag = False  # Ensure this is included
 
 # Initialize I2C
-i2c = busio.I2C(board.GP12, board.GP13)
+i2c = board.STEMMA_I2C()
+
 
 # Initialize AW9523
-aw = adafruit_aw9523.AW9523(i2c, address=0x5B)# Configure AW9523 pins for input with external pull-ups
-from digitalio import Direction
+# aw = adafruit_aw9523.AW9523(i2c, address=0x5B)# Configure AW9523 pins for input with external pull-ups
+# from digitalio import Direction
 
 # Configure the first 5 pins as inputs with Debouncer
-button_pins = [aw.get_pin(i) for i in range(5)]
-buttons = []
-for pin in button_pins:
-    pin.direction = Direction.INPUT  # Set direction to input
+# button_pins = [board.GP27(i) for i in range(1)]
+# buttons = []
+# for pin in button_pins:
+#    pin.direction = Direction.INPUT  # Set direction to input
     # Ensure you have external pull-up resistors
-    buttons.append(Debouncer(pin))
+#    buttons.append(Debouncer(pin))
 
 # Define variables for button states
-button_states = [False] * len(button_pins)
-
+#button_states = [False] * len(button_pins)
 
 # Setup play button
-start_button_in = DigitalInOut(board.D11)
+start_button_in = DigitalInOut(board.GP3)
 start_button_in.pull = Pull.UP
 start_button = Debouncer(start_button_in)
 
 # Define row and column pins for the 8x8 matrix
-row_pins = [board.D2, board.D3, board.D4, board.D5, board.D6, board.D7, board.D8, board.D9]
-col_pins = [board.D10, board.MOSI, board.MISO, board.SCK, board.A0, board.A1, board.A2, board.A3]
+row_pins = [board.GP6, board.GP7, board.GP8, board.GP9, board.GP10, board.GP11, board.GP12, board.GP13]
+col_pins = [board.GP16, board.GP17, board.GP18, board.GP19, board.GP20, board.GP21, board.GP22, board.GP26]
 
 # Initialize the KeyMatrix using the defined row and column pins
 keys = keypad.KeyMatrix(row_pins, col_pins, columns_to_anodes=True)
@@ -73,14 +76,10 @@ knobbutton = Debouncer(knobbutton_in)
 encoder_pos = encoder.position
 
 # Initialize UART for MIDI output on D0 (TX)
-uart = busio.UART(board.D0, baudrate=31250)
+uart = busio.UART(board.GP0, baudrate=31250)
 
 # Initialize MIDI over UART
 midi = MIDI(midi_out=uart, out_channel=9)  # MIDI channel 10 is 9 in code (0-15 range)
-
-# Initialize WS2811 LEDs on pin RX
-num_pixels = 64
-pixels = neopixel.NeoPixel(board.RX, num_pixels, auto_write=True)
 
 # Update LEDs based on the current sequence (Rev 2)
 def update_leds():
@@ -110,8 +109,8 @@ def neopixel_boot_sequence():
     for i in range(num_pixels):
         pixels[i] = (0, 70, 150)  # Blue color for boot sequence
         pixels.show()
-        time.sleep(0.008)
-    time.sleep(0.1)
+        time.sleep(0.004)
+    time.sleep(0.01)
     pixels.fill((0, 0, 0))
     pixels.show()
 
@@ -120,7 +119,7 @@ def neopixel_boot_sequence():
 neopixel_boot_sequence()
 
 # Define multiple patterns (Rev 1)
-num_patterns = 4
+num_patterns = 1
 sequences = [[[0] * sequence_length for _ in range(num_drums)] for _ in range(num_patterns)]
 
 # Initialize to load the first pattern by default (Rev 1)
@@ -164,28 +163,13 @@ def play_drum(note):
     time.sleep(0.01)  # Short delay to simulate the note being played
     midi.send(NoteOff(note, 0))  # Note off
 
-# V1.1 Define colors for each voice
-voice_colors = {
-    0: (255, 0, 0),    # Bass drum - Red
-    1: (0, 255, 0),    # Snare - Green
-    2: (0, 0, 255),    # Low Tom - Blue
-    3: (255, 255, 0),  # Mid Tom - Yellow
-    4: (255, 0, 255),  # High Tom - Magenta
-    5: (0, 255, 255),  # Rimshot - Cyan
-    6: (255, 165, 0),  # Hand Clap - Orange
-    7: (75, 0, 130),   # Cowbell - Indigo
-    8: (128, 0, 128),  # Cymbal - Purple
-    9: (255, 192, 203),# Open Hi-Hat - Pink
-    10: (0, 128, 0),   # Closed Hi-Hat - Dark Green
-}
-
 
 # Light steps (v1.1)
 def light_steps(voice_index, step_index, state):
     led_index = voice_index * 16 + step_index  # Map the voice and step to the LED index
 #    print(f"Debug: voice_index={voice_index}, step_index={step_index}, led_index={led_index}")  # Debugging
     color = voice_colors.get(voice_index, (8, 125, 60))  # Default to Purple if voice not found
-    if 0 <= led_index < 64:  # Ensure LED index is within the valid range
+    if 0 <= led_index < num_pixels:  # Ensure LED index is within the valid range
         if state:
             pixels[led_index] = color  # Set color based on voice
         else:
@@ -286,13 +270,13 @@ def handle_button_press(event):
     else:
         print(f"Released: Row {row}, Col {col}")
 
-def read_buttons():
-    for i, button in enumerate(buttons):
-        button.update()
-        if button.fell:  # Button press detected
-            print(f"Button {i} pressed")
-        elif button.rose:  # Button release detected
-            print(f"Button {i} released")
+# def read_buttons():
+#     for i, button in enumerate(buttons):
+#         button.update()
+#         if button.fell:  # Button press detected
+#             print(f"Button {i} pressed")
+#         elif button.rose:  # Button release detected
+#             print(f"Button {i} released")
 
 # Main Loop with Shuffle
 shuffle_amount = 0.0  # Adjust this value to control the shuffle amount (0.0 to 0.5)
@@ -307,7 +291,7 @@ while True:
         step_counter = 0
         last_step = int(ticks_add(ticks_ms(), -steps_millis))
         print("*** Play:", playing)
-#        update_leds()
+        update_leds()
 
     if playing:
         now = ticks_ms()
@@ -373,11 +357,11 @@ while True:
             toggle_pattern()
         last_encoder_pos = encoder_pos
         # Read button states from AW9523 (low priority)
-    read_buttons()
+#    read_buttons()
 
     # Example: Handle button presses
-    for i, pin in enumerate(button_pins):
-        if not pin.value:  # Button pressed (assuming active low)
-            print(f"Button {i} pressed")
-    read_buttons()
+#    for i, pin in enumerate(button_pins):
+#         if not pin.value:  # Button pressed (assuming active low)
+#             print(f"Button {i} pressed")
+#     read_buttons()
 #    time.sleep(0.1)  # Small delay for debouncing
