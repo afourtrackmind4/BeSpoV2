@@ -89,7 +89,6 @@ def neopixel_boot_sequence():
 neopixel_boot_sequence()
 
 print("Initialization complete")
-
 print("Section 2: Matrix Configuration and Key Handling")
 
 # Define row and column pins for the 12x8 matrix
@@ -97,7 +96,7 @@ col_pins = [board.GP6, board.GP7, board.GP8, board.GP9, board.GP10, board.GP11, 
 row_pins = [board.GP14, board.GP15, board.GP16, board.GP17, board.GP18, board.GP19, board.GP20, board.GP21, board.GP22, board.GP26, board.GP27, board.GP28]
 
 # Initialize the KeyMatrix using the defined row and column pins
-keys = keypad.KeyMatrix(row_pins, col_pins, columns_to_anodes=False)
+keys = keypad.KeyMatrix(row_pins, col_pins, columns_to_anodes=True)
 
 # STEMMA QT Rotary encoder setup
 rotary_seesaw = seesaw.Seesaw(i2c, addr=0x36)
@@ -174,10 +173,6 @@ def scroll_pattern(row, direction):
     update_leds()
 
 print("Pattern and voice management complete")
-
-
-### Section 4: Main Loop and LED Updates
-
 
 print("Section 4: Main Loop and LED Updates")
 
