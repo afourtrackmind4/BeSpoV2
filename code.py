@@ -1,7 +1,15 @@
+
+"""
+Build - 3
+
+Getting better
+
+"""
+
+
 import board
 import time
 from adafruit_ticks import ticks_ms, ticks_diff, ticks_add
-import digitalio
 from digitalio import DigitalInOut, Pull
 import keypad
 from adafruit_seesaw import seesaw, rotaryio, digitalio
@@ -18,7 +26,7 @@ print("Section 1: Initialization and Setup")
 # Global Variables
 num_pixels = 64
 num_rows = 4
-steps_per_row = num_pixels // num_rows  # This should be 16
+steps_per_row = num_pixels // num_rows # This should be 16
 pixels = neopixel.NeoPixel(board.GP2, num_pixels, auto_write=True)
 
 num_steps = 16
@@ -42,7 +50,6 @@ current_patterns = [0] * num_rows
 
 # Initialize I2C
 i2c = board.STEMMA_I2C()
-
 
 # Setup play button
 start_button_in = DigitalInOut(board.GP3)
@@ -79,28 +86,27 @@ display.marquee(str(bpm), 0.1, loop=False)
 
 # Boot sequence for Neopixels
 def neopixel_boot_sequence():
+    colors = [(165, 52, 35), (1, 51, 5), (8, 76, 4), (31, 89, 3), (132, 242, 130), (163, 96, 246), (237, 226, 247)]
     for i in range(num_pixels):
-        pixels[i] = (0, 70, 150)  # Blue color for boot sequence
+        pixels[i] = colors[i % len(colors)]
         pixels.show()
-        time.sleep(0.004)
-    time.sleep(0.01)
+        time.sleep(0.005)
+    time.sleep(0.1)
     pixels.fill((0, 0, 0))
     pixels.show()
-
 # Call the boot sequence
 neopixel_boot_sequence()
 
 print("Initialization complete")
+
 print("Section 2: Matrix Configuration and Key Handling")
 
 # Define row and column pins for the 12x8 matrix
-row_pins = [board.GP6, board.GP7, board.GP8, board.GP9, board.GP10, board.GP11, board.GP12, board.GP13]
-col_pins = [board.GP14, board.GP15, board.GP16, board.GP17, board.GP18, board.GP19, board.GP20, board.GP21, board.GP22, board.GP26, board.GP27, board.GP28]
+col_pins = [board.GP6, board.GP7, board.GP8, board.GP9, board.GP10, board.GP11, board.GP12, board.GP13]
+row_pins = [board.GP14, board.GP15, board.GP16, board.GP17, board.GP18, board.GP19, board.GP20, board.GP21, board.GP22, board.GP26, board.GP27, board.GP28]
 
-
-# Initialize KeyMatrix with correct configuration
-keys = keypad.KeyMatrix(row_pins, col_pins, columns_to_anodes=True)
-  # Correctly set columns_to_anodes to False
+# Initialize the KeyMatrix using the defined row and column pins
+keys = keypad.KeyMatrix(col_pins, row_pins, columns_to_anodes=True)
 
 # STEMMA QT Rotary encoder setup
 rotary_seesaw = seesaw.Seesaw(i2c, addr=0x36)
@@ -116,13 +122,15 @@ print("Matrix configuration complete")
 print("Section 3: Pattern and Voice Management")
 
 # Drum setup
-drum_names = ["Bass", "Snar", "LTom", "MTom", "HTom", "Clav", "Clap", "Cowb", "Cymb", "OHat", "CHat"]
-drum_notes = [36, 38, 41, 43, 45, 37, 39, 56, 49, 46, 42]  # general midi drum notes matched to 808
+drum_names = ["Bass", "Snar", "OHat", "CHat", "LTom", "MTom", "HTom", "Clav", "Clap", "Cowb", "Cymb"]
+drum_notes = [36, 38, 46, 42, 41, 43, 45, 37, 39, 56, 49]  # general midi drum notes matched to 808
 
 # Define default pattern for testing and debugging
 default_pattern = [
     [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],  # bass drum
     [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],  # snare
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # hihat open
+    [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],  # hihat closed
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # low tom
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # mid tom
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # high tom
@@ -130,8 +138,7 @@ default_pattern = [
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # handclap/maracas
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # cowbell
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # cymbal
-    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # hihat open
-    [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],  # hihat closed
+
 ]
 
 # Initialize the sequences with the default pattern
@@ -139,24 +146,25 @@ sequences = [default_pattern.copy() for _ in range(num_patterns)]
 
 # Define colors for each voice
 voice_colors = {
-    0: (255, 0, 0),    # Bass drum - Red
-    1: (0, 255, 0),    # Snare - Green
-    2: (0, 0, 255),    # Low Tom - Blue
-    3: (255, 255, 0),  # Mid Tom - Yellow
-    4: (255, 0, 255),  # High Tom - Magenta
-    5: (0, 255, 255),  # Rimshot - Cyan
-    6: (255, 165, 0),  # Hand Clap - Orange
-    7: (75, 0, 130),   # Cowbell - Indigo
-    8: (128, 0, 128),  # Cymbal - Purple
-    9: (255, 192, 203),# Open Hi-Hat - Pink
-    10: (0, 128, 0),   # Closed Hi-Hat - Dark Green
+    0: (165, 52, 35),   # Bass drum - Cambridge blue (#84A59D)
+    1: (1, 51, 5),  # Snare - Light coral (#F28482)
+    2: (8, 76, 4),  # Low Tom - Tea rose (#F5CAC3)
+    3: (31, 89, 3),  # Mid Tom - Linen (#F7EDE2)
+    4: (132, 242, 130),  # High Tom - Soft Coral (#F28482)
+    5: (163, 96, 246),   # Rimshot - Light Blue (#60A3F6)
+    6: (237, 226, 247),  # Hand Clap - Soft Lilac (#E2EDF7)
+    7: (202, 195, 245),  # Cowbell - Light Lavender (#C3CAF5)
+    8: (132, 157, 165),  # Cymbal - Soft Teal (#9D84A5)
+    9: (132, 130, 242),  # Open Hi-Hat - Soft Blue (#8284F2)
+    10: (132, 242, 130), # Closed Hi-Hat - Soft Coral (#F28482)
 }
+
 
 # Load pattern
 def load_pattern(pattern_index):
     global sequence
     sequence = sequences[pattern_index]
-    update_leds() # Update LEDs to reflect the loaded pattern
+    pixels.fill() # Update LEDs to reflect the loaded pattern
 
 # Toggle pattern selection
 def toggle_pattern():
@@ -169,14 +177,18 @@ def toggle_pattern():
 # Scroll through voices for a specific row
 def scroll_voice(row, direction):
     current_voices[row] = (current_voices[row] + direction) % len(voice_colors)
-    update_leds()
+    pixels.show()
 
 # Scroll through patterns for a specific row
 def scroll_pattern(row, direction):
     current_patterns[row] = (current_patterns[row] + direction) % num_patterns
-    update_leds()
+    pixels.show()
 
 print("Pattern and voice management complete")
+
+
+### Section 4: Main Loop and LED Updates
+
 
 print("Section 4: Main Loop and LED Updates")
 
@@ -184,13 +196,14 @@ print("Section 4: Main Loop and LED Updates")
 def play_drum(note):
     midi.send(NoteOn(note, 120))  # Note on with velocity 120
     time.sleep(0.01)  # Short delay to simulate the note being played
-    midi.send(NoteOff(note, 0))  # Note off
+    midi.send(NoteOff(note, 0))# Note off
+    pixels.show()
 
 # Light steps
 def light_steps(voice_index, step_index, state):
     led_index = voice_index * steps_per_row + step_index  # Map the voice and step to the LED index
     if led_index < num_pixels:  # Ensure LED index is within the 64 LEDs
-        color = voice_colors.get(voice_index, (8, 125, 60))  # Default to Purple if voice not found
+        color = voice_colors.get(voice_index)  # Default to Purple if voice not found, (8, 125, 60)
         if state:
             pixels[led_index] = color  # Set color based on voice
         else:
@@ -215,7 +228,7 @@ def light_beat(step):
     for row in range(num_rows):  # Ensure it iterates through rows
         led_index = row * steps_per_row + step
         if led_index < num_pixels:
-            pixels[led_index] = (70, 20, 0)  # Red color for the beat indicator
+            pixels[led_index] = (0, 20, 0)  # Red color for the beat indicator
     pixels.show()
 
 # Toggle edit mode
@@ -243,40 +256,10 @@ scroll_voice_down_key = (8, 1)  # Example position, adjust as needed
 scroll_pattern_up_key = (9, 0)  # Example position, adjust as needed
 scroll_pattern_down_key = (9, 1)  # Example position, adjust as needed
 
-def handle_button_press(event):
-    global voice_change_flag
-    col, row = divmod(event.key_number, len(col_pins))
-    print(f"Button pressed: {event.key_number}, Row: {row}, Col: {col}")
-    
-    if event.pressed:
-        if (row, col) == scroll_voice_up_key:
-            scroll_voice(0, 1)  # Scroll voice up for row 0, adjust as needed
-        elif (row, col) == scroll_voice_down_key:
-            scroll_voice(0, -1)  # Scroll voice down for row 0, adjust as needed
-        elif (row, col) == scroll_pattern_up_key:
-            scroll_pattern(0, 1)  # Scroll pattern up for row 0, adjust as needed
-        elif (row, col) == scroll_pattern_down_key:
-            scroll_pattern(0, -1)  # Scroll pattern down for row 0, adjust as needed
-        else:
-            # Adjust row to map to voice index
-            if row < 8:
-                voice_index = row // 2  # Integer division to map two rows to one voice index
-                step_index = col + (row % 2) * 8  # Map columns to step index within 16 steps
-                
-                if step_index < 16 and voice_index < 4:  # Ensure within bounds
-                    pattern_index = current_patterns[voice_index]
-                    sequences[pattern_index][voice_index][step_index] = not sequences[pattern_index][voice_index][step_index]  # Toggle step state
-                    light_steps(voice_index, step_index, sequences[pattern_index][voice_index][step_index])  # Update LED
-                    voice_change_flag = True  # Set the flag for voice change
-
-    update_leds()
-
-
-"""
 # Handle button press events and set the flag for voice change
 def handle_button_press(event):
     global voice_change_flag
-    col, row = divmod(event.key_number, len(col_pins))
+    col, row = divmod(event.key_number, len(row_pins))
     print(f"Button pressed: {event.key_number}, Row: {row}, Col: {col}")
     if event.pressed:
         if (row, col) == scroll_voice_up_key:
@@ -297,8 +280,8 @@ def handle_button_press(event):
                     sequences[pattern_index][row][step_index] = not sequences[pattern_index][row][step_index]  # Toggle step state
                     light_steps(row, step_index, sequences[pattern_index][row][step_index])  # Update LED
                     voice_change_flag = True  # Set the flag for voice change
+
 update_leds()
-"""
 print("Setup Complete")
 
 # Main Loop with Shuffle
