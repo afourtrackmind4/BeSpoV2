@@ -1,14 +1,16 @@
 
 """
-Build - 3
 
-Getting better
+Charlie Edition
+working matrix
+
 
 """
 
 
 import board
 import time
+import supervisor
 from adafruit_ticks import ticks_ms, ticks_diff, ticks_add
 from digitalio import DigitalInOut, Pull
 import keypad
@@ -23,6 +25,7 @@ from adafruit_midi.note_off import NoteOff
 
 print("Section 1: Initialization and Setup")
 
+
 # Global Variables
 num_pixels = 64
 num_rows = 4
@@ -31,7 +34,7 @@ pixels = neopixel.NeoPixel(board.GP2, num_pixels, auto_write=True)
 
 num_steps = 16
 num_drums = 11
-bpm = 120.0
+bpm = 110.0
 beat_time = 60.0 / bpm
 beat_millis = beat_time * 1000.0
 steps_per_beat = 4
@@ -85,7 +88,13 @@ time.sleep(0.2)
 display.marquee(str(bpm), 0.1, loop=False)
 
 # Boot sequence for Neopixels
+
+
+
+
 def neopixel_boot_sequence():
+    start_msecs = supervisor.ticks_ms()
+
     colors = [(165, 52, 35), (1, 51, 5), (8, 76, 4), (31, 89, 3), (132, 242, 130), (163, 96, 246), (237, 226, 247)]
     for i in range(num_pixels):
         pixels[i] = colors[i % len(colors)]
@@ -94,6 +103,8 @@ def neopixel_boot_sequence():
     time.sleep(0.1)
     pixels.fill((0, 0, 0))
     pixels.show()
+    stop_msecs = supervisor.ticks_ms()
+#    print("elapsed time: boot seq = ", (stop_msecs - start_msecs)/1000)
 # Call the boot sequence
 neopixel_boot_sequence()
 
@@ -127,10 +138,10 @@ drum_notes = [36, 38, 46, 42, 41, 43, 45, 37, 39, 56, 49]  # general midi drum n
 
 # Define default pattern for testing and debugging
 default_pattern = [
-    [1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0],  # bass drum
-    [0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0],  # snare
+    [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0],  # bass drum
+    [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],  # snare
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # hihat open
-    [0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0],  # hihat closed
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # hihat closed
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # low tom
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # mid tom
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],  # high tom
@@ -146,7 +157,7 @@ sequences = [default_pattern.copy() for _ in range(num_patterns)]
 
 # Define colors for each voice
 voice_colors = {
-    0: (165, 52, 35),   # Bass drum - Cambridge blue (#84A59D)
+    0: (165, 52, 35),   # Bass drum - Cambridge blue (#84A59D)  
     1: (1, 51, 5),  # Snare - Light coral (#F28482)
     2: (8, 76, 4),  # Low Tom - Tea rose (#F5CAC3)
     3: (31, 89, 3),  # Mid Tom - Linen (#F7EDE2)
@@ -201,6 +212,7 @@ def play_drum(note):
 
 # Light steps
 def light_steps(voice_index, step_index, state):
+    bstart_msecs = supervisor.ticks_ms()
     led_index = voice_index * steps_per_row + step_index  # Map the voice and step to the LED index
     if led_index < num_pixels:  # Ensure LED index is within the 64 LEDs
         color = voice_colors.get(voice_index)  # Default to Purple if voice not found, (8, 125, 60)
@@ -209,6 +221,8 @@ def light_steps(voice_index, step_index, state):
         else:
             pixels[led_index] = (0, 0, 0)  # Off for inactive steps
         pixels.show()
+    bstop_msecs = supervisor.ticks_ms()
+#    print("elapsed time: light steps = ", (bstop_msecs - bstart_msecs)/1000)
 
 # Update LEDs based on the current sequence and pointers
 def update_leds():
@@ -257,11 +271,12 @@ scroll_pattern_up_key = (9, 0)  # Example position, adjust as needed
 scroll_pattern_down_key = (9, 1)  # Example position, adjust as needed
 
 # Handle button press events and set the flag for voice change
-def handle_button_press(event):
+def handle_button_press(event2):
+    bstart_msecs = supervisor.ticks_ms()
     global voice_change_flag
-    col, row = divmod(event.key_number, len(row_pins))
-    print(f"Button pressed: {event.key_number}, Row: {row}, Col: {col}")
-    if event.pressed:
+    col, row = divmod(event2.key_number, len(row_pins))
+    print(f"Button pressed: {event2.key_number}, Row: {row}, Col: {col}")
+    if event2.pressed:
         if (row, col) == scroll_voice_up_key:
             scroll_voice(0, 1)  # Scroll voice up for row 0, adjust as needed
         elif (row, col) == scroll_voice_down_key:
@@ -271,15 +286,27 @@ def handle_button_press(event):
         elif (row, col) == scroll_pattern_down_key:
             scroll_pattern(0, -1)  # Scroll pattern down for row 0, adjust as needed
         else:
+            if row == 1 or row == 3 or row == 5 or row == 7:
+                col = col + 8
+            if row in [0, 1]:
+                row = 0
+            elif row in [2, 3]:
+                row = 1
+            elif row in [4, 5]:
+                row = 2
+            elif row in [6, 7]:
+                row = 3
+            
             # Handle normal sequence key presses
             if row < num_rows and col < steps_per_row:
                 step_index = col
-                voice_index = current_voices[row]
                 pattern_index = current_patterns[row]
                 if step_index < len(sequences[pattern_index][row]):  # Ensure step_index is within the bounds of the sequence
                     sequences[pattern_index][row][step_index] = not sequences[pattern_index][row][step_index]  # Toggle step state
                     light_steps(row, step_index, sequences[pattern_index][row][step_index])  # Update LED
                     voice_change_flag = True  # Set the flag for voice change
+    bstop_msecs = supervisor.ticks_ms()
+#    print("elapsed time: button press = ", (bstop_msecs - bstart_msecs)/1000)
 
 update_leds()
 print("Setup Complete")
@@ -289,12 +316,14 @@ shuffle_amount = 0.0  # Adjust this value to control the shuffle amount (0.0 to 
 sequence = sequences[current_pattern]
 
 while True:
+    start_msecs = supervisor.ticks_ms()
     sequence = sequences[current_pattern]
     # Update the start button state
     start_button.update()
     if start_button.fell:  # If the play button is pressed
         if playing:
-            print_sequence()
+            xyz = 1
+            #print_sequence()
         playing = not playing
         step_counter = 0
         last_step = int(ticks_add(ticks_ms(), -steps_millis))
@@ -315,21 +344,21 @@ while True:
             light_beat(step_counter)  # Update beat indicator LED
 
             # Debugging prints to check indices and arrays
-            print(f"step_counter: {step_counter}")
-            print(f"sequence length: {len(sequence)}")  # Check length of sequence
+            #print(f"step_counter: {step_counter}")
+            #print(f"sequence length: {len(sequence)}")  # Check length of sequence
             for i in range(min(num_rows, len(sequence))):  # Ensure we stay within bounds
-                print(f"Checking sequence[{i}]: {sequence[i]}")
+                #print(f"Checking sequence[{i}]: {sequence[i]}")
                 if step_counter < len(sequence[i]):  # Ensure step_counter is within the length of sequence[i]
                     if sequence[i][step_counter]:  # Check if step_counter is within bounds
                         if i < len(drum_notes):
                             play_drum(drum_notes[i % len(drum_notes)])
-                        else:
-                            print(f"Index {i} out of range for drum_notes (length {len(drum_notes)})")
+                        #else:
+                            #print(f"Index {i} out of range for drum_notes (length {len(drum_notes)})")
                         light_steps(i, step_counter, sequence[i][step_counter])
-                    else:
-                        print(f"step_counter {step_counter} out of range for sequence[{i}] (length {len(sequence[i])})")
+                   # else:
+                        #print(f"step_counter {step_counter} out of range for sequence[{i}] (length {len(sequence[i])})")
 
-            print(f"curr_drum: {curr_drum}")  # Print curr_drum value
+            #print(f"curr_drum: {curr_drum}")  # Print curr_drum value
             if curr_drum < len(sequence):
                 if step_counter < len(sequence[curr_drum]):
                     light_steps(curr_drum, step_counter, sequence[curr_drum][step_counter])
@@ -390,5 +419,7 @@ while True:
         elif edit_mode == 3:
             toggle_pattern()
         last_encoder_pos = encoder_pos
+    stop_msecs = supervisor.ticks_ms()
+#    print("elapsed time: main loop = ", (stop_msecs - start_msecs))
 
-print("Main loop and LED updates complete")
+# print("Main loop and LED updates complete")
